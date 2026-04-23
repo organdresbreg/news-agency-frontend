@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WebSocketProvider } from "@/lib/websocket-context";
+// import { WebSocketProvider } from "@/lib/websocket-context";
 import { ThemeProvider } from "@/components/theme-provider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -11,9 +11,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <WebSocketProvider>
+        {/* <WebSocketProvider> */}
           {children}
-        </WebSocketProvider>
+        {/* </WebSocketProvider> */}
       </ThemeProvider>
     </QueryClientProvider>
   );

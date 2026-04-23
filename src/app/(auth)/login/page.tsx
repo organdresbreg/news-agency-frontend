@@ -24,16 +24,22 @@ interface LoginResponse {
 
 // Función de llamada al backend (ajustá la URL según tu backend FastAPI)
 const loginUser = async ({ email, password }: { email: string; password: string }): Promise<LoginResponse> => {
-    const response = await fetch("http://localhost:8000/login", { // Cambiá esto por tu endpoint real
+    const formData = new URLSearchParams();
+    formData.append("email", email);
+    formData.append("password", password);
+    formData.append("grant_type", "password");
+
+    const response = await fetch("http://localhost:8000/api/v1/auth/login", {
         method: "POST",
         headers: {
-            "Content-Type": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: JSON.stringify({ email, password }),
+        body: formData,
     });
 
     if (!response.ok) {
-        throw new Error("Credenciales inválidas");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || "Credenciales inválidas");
     }
 
     return response.json();
@@ -53,7 +59,7 @@ export default function LoginPage() {
             localStorage.setItem("access_token", data.access_token);
 
             // Redirigir al dashboard o página principal
-            router.push("/dashboard"); // O "/" si tu home es el dashboard
+            router.push("/dashboard");
         },
         onError: (err) => {
             setError(err.message || "Ocurrió un error al iniciar sesión");

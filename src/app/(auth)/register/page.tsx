@@ -17,10 +17,10 @@ interface RegisterResponse {
 }
 
 const registerUser = async ({ name, email, password }: { name: string; email: string; password: string }): Promise<RegisterResponse> => {
-    const response = await fetch("http://localhost:8000/register", {
+    const response = await fetch("http://localhost:8000/api/v1/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ username: name, email, password }),
     })
 
     if (!response.ok) {
