@@ -8,9 +8,10 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2 } from "lucide-react"
+import { Loader2, Eye, EyeOff } from "lucide-react"
+import { ModeToggle } from "@/components/mode-toggle"
 
 interface RegisterResponse {
     message: string
@@ -37,12 +38,13 @@ export default function RegisterPage() {
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
+    const [showPassword, setShowPassword] = useState(false)
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     const mutation = useMutation({
         mutationFn: registerUser,
         onSuccess: () => {
-            // Redirigimos al login para que inicie sesión con sus nuevas credenciales
             router.push("/login")
         },
         onError: (err) => {
@@ -54,7 +56,6 @@ export default function RegisterPage() {
         e.preventDefault()
         setError(null)
 
-        // Validación simple de contraseñas
         if (password !== confirmPassword) {
             setError("Las contraseñas no coinciden")
             return
@@ -69,25 +70,25 @@ export default function RegisterPage() {
     }
 
     return (
-        <div className="flex min-h-screen items-center justify-center">
-            <Card className="w-full max-w-[400px] border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-xl">
+        <div className="flex min-h-screen items-center justify-center bg-background">
+            <Card className="w-full max-w-[400px] border-border bg-card shadow-lg rounded-xl overflow-hidden">
                 <CardHeader className="space-y-2 text-center">
                     <div className="mx-auto w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
                     </div>
-                    <CardTitle className="text-2xl font-bold text-slate-900 dark:text-white">Crear Cuenta</CardTitle>
+                    <CardTitle className="text-2xl font-bold">Crear Cuenta</CardTitle>
                 </CardHeader>
 
                 <form onSubmit={handleSubmit}>
-                    <CardContent className="space-y-5">
+                    <CardContent className="space-y-5 px-8">
                         {error && (
-                            <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200">
+                            <Alert variant="destructive">
                                 <AlertDescription>{error}</AlertDescription>
                             </Alert>
                         )}
 
                         <div className="space-y-2">
-                            <Label htmlFor="name" className="text-sm font-medium text-slate-700 dark:text-slate-300">Nombre Completo</Label>
+                            <Label htmlFor="name">Nombre</Label>
                             <Input
                                 id="name"
                                 type="text"
@@ -96,12 +97,11 @@ export default function RegisterPage() {
                                 onChange={(e) => setName(e.target.value)}
                                 required
                                 disabled={mutation.isPending}
-                                className="h-11 bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 dark:bg-slate-700 dark:border-slate-600 dark:focus:bg-slate-600 dark:text-white transition-all"
                             />
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300">Correo Electrónico</Label>
+                            <Label htmlFor="email">Email</Label>
                             <Input
                                 id="email"
                                 type="email"
@@ -110,43 +110,62 @@ export default function RegisterPage() {
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
                                 disabled={mutation.isPending}
-                                className="h-11 bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 dark:bg-slate-700 dark:border-slate-600 dark:focus:bg-slate-600 dark:text-white transition-all"
                             />
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300">Contraseña</Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                placeholder="••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                disabled={mutation.isPending}
-                                className="h-11 bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 dark:bg-slate-700 dark:border-slate-600 dark:focus:bg-slate-600 dark:text-white transition-all"
-                            />
+                            <Label htmlFor="password">Contraseña</Label>
+                            <div className="relative">
+                                <Input
+                                    id="password"
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="••••••••"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                    disabled={mutation.isPending}
+                                    className="pr-10"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+                                    tabIndex={-1}
+                                >
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="confirmPassword" className="text-sm font-medium text-slate-700 dark:text-slate-300">Confirmar Contraseña</Label>
-                            <Input
-                                id="confirmPassword"
-                                type="password"
-                                placeholder="••••••••"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                required
-                                disabled={mutation.isPending}
-                                className="h-11 bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 dark:bg-slate-700 dark:border-slate-600 dark:focus:bg-slate-600 dark:text-white transition-all"
-                            />
+                            <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
+                            <div className="relative">
+                                <Input
+                                    id="confirmPassword"
+                                    type={showConfirmPassword ? "text" : "password"}
+                                    placeholder="••••••••"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    required
+                                    disabled={mutation.isPending}
+                                    className="pr-10"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+                                    tabIndex={-1}
+                                >
+                                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
                         </div>
                     </CardContent>
 
-                    <CardFooter className="flex flex-col space-y-4 pt-2">
+                    <CardFooter className="flex flex-col space-y-4 px-8 pb-8 pt-4">
                         <Button
                             type="submit"
-                            className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-600/20 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-all duration-200"
                             disabled={mutation.isPending}
                         >
                             {mutation.isPending ? (
@@ -159,9 +178,9 @@ export default function RegisterPage() {
                             )}
                         </Button>
 
-                        <div className="text-center text-sm text-slate-600 dark:text-slate-400">
+                        <div className="text-center text-sm text-muted-foreground pt-2">
                             ¿Ya tenés cuenta?{" "}
-                            <Link href="/login" className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline-offset-4 hover:underline transition-colors">
+                            <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-700 underline-offset-4 hover:underline transition-colors">
                                 Iniciá sesión acá
                             </Link>
                         </div>

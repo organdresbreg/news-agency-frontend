@@ -1,4 +1,5 @@
 // src/app/(auth)/layout.tsx
+import { ModeToggle } from "@/components/mode-toggle";
 
 export default function AuthLayout({
     children,
@@ -6,9 +7,11 @@ export default function AuthLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="flex min-h-screen w-full items-center justify-center bg-background">
-            {/* Contenedor opcional para limitar el ancho máximo si querés más control visual */}
-            <div className="w-full max-w-md p-4">
+        <div className="flex min-h-screen w-full items-center justify-center bg-background relative">
+            <div className="absolute top-6 right-6 z-50">
+                <ModeToggle />
+            </div>
+            <div className="w-full h-full flex items-center justify-center">
                 {children}
             </div>
         </div>
