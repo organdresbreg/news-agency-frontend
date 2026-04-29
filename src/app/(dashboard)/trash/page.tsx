@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Trash2, RotateCcw, CheckSquare, Square } from 'lucide-react';
 import { useHighlightStore } from '@/stores/highlightStore';
+import { api } from '@/lib/api-client';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('Trash');
 
 const Trash = () => {
     const { highlights, addHighlight } = useHighlightStore();
@@ -13,13 +17,10 @@ const Trash = () => {
 
     const fetchRejectedNews = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/v1/newsroom/news/rejected');
-            if (response.ok) {
-                const data = await response.json();
-                setNewsItems(data);
-            }
+            const data = await api.get('/api/v1/newsroom/news/rejected');
+            setNewsItems(data);
         } catch (error) {
-            console.error('Error fetching rejected news:', error);
+            logger.error('Error fetching rejected news', error as Error);
             toast.error('Error al cargar la papelera');
         } finally {
             setLoading(false);
@@ -29,16 +30,11 @@ const Trash = () => {
     const handleRestore = async (id: number) => {
         setNewsItems(prev => prev.filter(item => item.id !== id));
         try {
-            const response = await fetch(`http://localhost:8000/api/v1/newsroom/news/${id}/restore`, {
-                method: 'PUT'
-            });
-            if (response.ok) {
-                toast.success('Noticia restaurada');
-                addHighlight('dashboard', [id]);
-            } else {
-                throw new Error('Failed to restore');
-            }
+            await api.put(`/api/v1/newsroom/news/${id}/restore`);
+            toast.success('Noticia restaurada');
+            addHighlight('dashboard', [id]);
         } catch (error) {
+            logger.error('Error restoring news', error as Error);
             toast.error('Error al restaurar noticia');
             fetchRejectedNews();
         }
@@ -48,15 +44,10 @@ const Trash = () => {
         if (!window.confirm('¿Estás seguro de eliminar esta noticia permanentemente?')) return;
         setNewsItems(prev => prev.filter(item => item.id !== id));
         try {
-            const response = await fetch(`http://localhost:8000/api/v1/newsroom/news/${id}`, {
-                method: 'DELETE'
-            });
-            if (response.ok) {
-                toast.success('Noticia eliminada permanentemente');
-            } else {
-                throw new Error('Failed to delete');
-            }
+            await api.delete(`/api/v1/newsroom/news/${id}`);
+            toast.success('Noticia eliminada permanentemente');
         } catch (error) {
+            logger.error('Error deleting news', error as Error);
             toast.error('Error al eliminar noticia');
             fetchRejectedNews();
         }
@@ -67,18 +58,11 @@ const Trash = () => {
         setSelectedItems(new Set());
         setNewsItems(prev => prev.filter(item => !selectedItems.has(item.id)));
         try {
-            const response = await fetch('http://localhost:8000/api/v1/newsroom/news/batch/restore', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids: itemsToProcess })
-            });
-            if (response.ok) {
-                toast.success(`${itemsToProcess.length} noticias restauradas`);
-                addHighlight('dashboard', itemsToProcess);
-            } else {
-                throw new Error('Failed to restore batch');
-            }
+            await api.post('/api/v1/newsroom/news/batch/restore', { ids: itemsToProcess });
+            toast.success(`${itemsToProcess.length} noticias restauradas`);
+            addHighlight('dashboard', itemsToProcess);
         } catch (error) {
+            logger.error('Error batch restoring news', error as Error);
             toast.error('Error al restaurar noticias');
             fetchRejectedNews();
         }
@@ -90,17 +74,10 @@ const Trash = () => {
         setSelectedItems(new Set());
         setNewsItems(prev => prev.filter(item => !selectedItems.has(item.id)));
         try {
-            const response = await fetch('http://localhost:8000/api/v1/newsroom/news/batch/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids: itemsToProcess })
-            });
-            if (response.ok) {
-                toast.success(`${itemsToProcess.length} noticias eliminadas`);
-            } else {
-                throw new Error('Failed to delete batch');
-            }
+            await api.post('/api/v1/newsroom/news/batch/delete', { ids: itemsToProcess });
+            toast.success(`${itemsToProcess.length} noticias eliminadas`);
         } catch (error) {
+            logger.error('Error batch deleting news', error as Error);
             toast.error('Error al eliminar noticias');
             fetchRejectedNews();
         }
@@ -112,15 +89,10 @@ const Trash = () => {
         setNewsItems([]);
         setSelectedItems(new Set());
         try {
-            const response = await fetch('http://localhost:8000/api/v1/newsroom/news/rejected/all', {
-                method: 'DELETE'
-            });
-            if (response.ok) {
-                toast.success('Papelera vaciada');
-            } else {
-                throw new Error('Failed to empty trash');
-            }
+            await api.delete('/api/v1/newsroom/news/rejected/all');
+            toast.success('Papelera vaciada');
         } catch (error) {
+            logger.error('Error emptying trash', error as Error);
             toast.error('Error al vaciar la papelera');
             fetchRejectedNews();
         }

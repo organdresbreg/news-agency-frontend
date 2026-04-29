@@ -6,9 +6,13 @@ import { Filter, CheckSquare, Square, Trash2, RefreshCw, LayoutDashboard, Extern
 import { useHighlightStore } from '@/stores/highlightStore';
 import Reader from '@/components/Reader';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api-client';
+import { useApiError } from '@/hooks/useApiError';
+import { logger } from '@/lib/logger';
 
 const News = () => {
     const { highlights, addHighlight } = useHighlightStore();
+    const { handleError, handleSuccess } = useApiError();
     const [stats, setStats] = useState({
         active_news: 0,
         sources_count: 0
@@ -27,26 +31,20 @@ const News = () => {
 
     const fetchStats = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/v1/newsroom/dashboard-stats');
-            if (response.ok) {
-                const data = await response.json();
-                setStats(data);
-            }
+            const data = await api.get('/api/v1/newsroom/dashboard-stats');
+            setStats(data);
         } catch (error) {
-            console.error('Error fetching dashboard stats:', error);
+            handleError(error, { showToast: false, silentErrors: ['NotFoundError'] });
         }
     };
 
     const fetchNews = async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const response = await fetch('http://localhost:8000/api/v1/newsroom/news/discovered');
-            if (response.ok) {
-                const data = await response.json();
-                setNewsItems(data);
-            }
+            const data = await api.get('/api/v1/newsroom/news/discovered');
+            setNewsItems(data);
         } catch (error) {
-            console.error('Error fetching news:', error);
+            handleError(error, { showToast: !silent });
         } finally {
             if (!silent) setLoading(false);
         }
@@ -54,31 +52,23 @@ const News = () => {
 
     const fetchSources = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/v1/newsroom/sources');
-            if (response.ok) {
-                const data = await response.json();
-                setSources(data);
-            }
+            const data = await api.get('/api/v1/newsroom/sources');
+            setSources(data);
         } catch (error) {
-            console.error('Error fetching sources:', error);
+            handleError(error, { showToast: false });
         }
     };
 
     const handleScan = async () => {
         setScanning(true);
         try {
-            const response = await fetch('http://localhost:8000/api/v1/newsroom/scan', { method: 'POST' });
-            if (response.ok) {
-                const data = await response.json();
-                toast.success(`Escaneo completado. ${data.new_items} noticias nuevas.`);
-                setNewlyFoundIds(data.new_item_ids || []);
-                await fetchStats();
-                await fetchNews();
-            } else {
-                toast.error('Error al escanear fuentes.');
-            }
+            const data = await api.post('/api/v1/newsroom/scan', {});
+            handleSuccess(`Escaneo completado. ${data.new_items} noticias nuevas.`);
+            setNewlyFoundIds(data.new_item_ids || []);
+            await fetchStats();
+            await fetchNews();
         } catch (error) {
-            toast.error('Error de conexión.');
+            handleError(error, { customMessage: 'Error al escanear fuentes.' });
         } finally {
             setScanning(false);
         }
@@ -96,23 +86,14 @@ const News = () => {
         });
 
         try {
-            const response = await fetch(`http://localhost:8000/api/v1/newsroom/news/${id}/status`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to update status');
-            }
-            toast.success('Noticia descartada');
+            await api.put(`/api/v1/newsroom/news/${id}/status`, { status });
+            handleSuccess('Noticia descartada');
             if (status === 'REJECTED') {
                 addHighlight('trash', [id]);
             }
             fetchStats(); // Update stats to reflect changes
         } catch (error) {
-            console.error('Error updating status:', error);
-            toast.error('Error al actualizar estado');
+            handleError(error, { customMessage: 'Error al actualizar estado' });
             fetchNews(); // Revert on error
         }
     };
@@ -127,18 +108,14 @@ const News = () => {
         let successCount = 0;
         for (const id of itemsToProcess) {
             try {
-                const response = await fetch(`http://localhost:8000/api/v1/newsroom/news/${id}/status`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status })
-                });
-                if (response.ok) successCount++;
+                await api.put(`/api/v1/newsroom/news/${id}/status`, { status });
+                successCount++;
             } catch (error) {
-                console.error(`Error updating item ${id}`, error);
+                logger.warn(`Error updating item ${id}`, error);
             }
         }
 
-        toast.success(`${successCount} noticias descartadas`);
+        handleSuccess(`${successCount} noticias descartadas`);
         fetchStats();
     };
 

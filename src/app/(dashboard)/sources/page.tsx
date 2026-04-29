@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '@/lib/api-client';
+import { useApiError } from '@/hooks/useApiError';
 import {
     Trash2, Plus, Globe, Rss, Pencil,
     X, Share2, Database, Video, FileText,
     CheckCircle2
 } from 'lucide-react';
-import { toast } from 'sonner';
 
 const SOURCE_TYPES = [
     {
@@ -67,6 +67,7 @@ const SOURCE_TYPES = [
 ];
 
 const Sources = () => {
+    const { handleError, handleSuccess } = useApiError();
     const [sources, setSources] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -77,11 +78,10 @@ const Sources = () => {
 
     const fetchSources = async () => {
         try {
-            const response = await axios.get('http://localhost:8000/api/v1/newsroom/sources');
-            setSources(response.data);
+            const data = await api.get('/api/v1/newsroom/sources');
+            setSources(data);
         } catch (error) {
-            console.error('Error fetching sources:', error);
-            toast.error('Error al cargar las fuentes');
+            handleError(error, { showToast: false });
         } finally {
             setLoading(false);
         }
@@ -117,29 +117,27 @@ const Sources = () => {
         };
         try {
             if (editingId) {
-                await axios.put(`http://localhost:8000/api/v1/newsroom/sources/${editingId}`, payload);
-                toast.success('Fuente actualizada correctamente');
+                await api.put(`/api/v1/newsroom/sources/${editingId}`, payload);
+                handleSuccess('Fuente actualizada correctamente');
             } else {
-                await axios.post('http://localhost:8000/api/v1/newsroom/sources', payload);
-                toast.success('Fuente agregada correctamente');
+                await api.post('/api/v1/newsroom/sources', payload);
+                handleSuccess('Fuente agregada correctamente');
             }
             resetForm();
             fetchSources();
         } catch (error) {
-            console.error('Error saving source:', error);
-            toast.error('Error al guardar la fuente');
+            handleError(error, { customMessage: 'Error al guardar la fuente' });
         }
     };
 
     const handleDelete = async (id: number) => {
         if (!window.confirm('¿Estás seguro de que deseas eliminar esta fuente?')) return;
         try {
-            await axios.delete(`http://localhost:8000/api/v1/newsroom/sources/${id}`);
-            toast.success('Fuente eliminada correctamente');
+            await api.delete(`/api/v1/newsroom/sources/${id}`);
+            handleSuccess('Fuente eliminada correctamente');
             fetchSources();
         } catch (error) {
-            console.error('Error deleting source:', error);
-            toast.error('Error al eliminar la fuente');
+            handleError(error, { customMessage: 'Error al eliminar la fuente' });
         }
     };
 
