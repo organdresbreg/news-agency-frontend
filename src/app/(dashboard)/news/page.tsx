@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 import { Filter, CheckSquare, Square, Trash2, RefreshCw, LayoutDashboard, ExternalLink, FileText, Loader2 } from 'lucide-react';
 import { useHighlightStore } from '@/stores/highlightStore';
 import Reader from '@/components/Reader';
@@ -33,7 +34,7 @@ const News = () => {
                 setStats(data);
             }
         } catch (error) {
-            console.error('Error fetching dashboard stats:', error);
+            logger.error('Error fetching dashboard stats:', error as Error);
         }
     };
 
@@ -46,7 +47,7 @@ const News = () => {
                 setNewsItems(data);
             }
         } catch (error) {
-            console.error('Error fetching news:', error);
+            logger.error('Error fetching news:', error as Error);
         } finally {
             if (!silent) setLoading(false);
         }
@@ -60,7 +61,7 @@ const News = () => {
                 setSources(data);
             }
         } catch (error) {
-            console.error('Error fetching sources:', error);
+            logger.error('Error fetching sources:', error as Error);
         }
     };
 
@@ -111,7 +112,7 @@ const News = () => {
             }
             fetchStats(); // Update stats to reflect changes
         } catch (error) {
-            console.error('Error updating status:', error);
+            logger.error('Error updating status:', error as Error);
             toast.error('Error al actualizar estado');
             fetchNews(); // Revert on error
         }
@@ -134,7 +135,7 @@ const News = () => {
                 });
                 if (response.ok) successCount++;
             } catch (error) {
-                console.error(`Error updating item ${id}`, error);
+                logger.error(`Error updating item ${id}`, error as Error);
             }
         }
 

@@ -1,6 +1,9 @@
 // src/lib/websocket.ts
 
 import { WsEvent, WsEventType } from "@/types/ws-events";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger('WebSocket');
 
 type EventCallback = (event: WsEvent) => void;
 
@@ -22,7 +25,7 @@ class WebSocketClient {
         this.socket = new WebSocket(this.url);
 
         this.socket.onopen = () => {
-            console.log("[WS] Conexión establecida");
+            logger.info('Conexión establecida', { url: this.url });
             this.reconnectAttempts = 0;
         };
 
@@ -31,17 +34,17 @@ class WebSocketClient {
                 const data = JSON.parse(event.data);
                 this.emit(data.type, data);
             } catch (error) {
-                console.error("[WS] Error al parsear evento:", error);
+                logger.error('Error al parsear evento', error as Error, { raw: event.data });
             }
         };
 
         this.socket.onclose = () => {
-            console.log("[WS] Conexión cerrada. Intentando reconectar...");
+            logger.info('Conexión cerrada. Intentando reconectar...');
             this.handleReconnect();
         };
 
         this.socket.onerror = (error) => {
-            console.error("[WS] Error de conexión:", error);
+            logger.error('Error de conexión', undefined, { error });
         };
     }
 
@@ -56,7 +59,7 @@ class WebSocketClient {
         if (this.socket?.readyState === WebSocket.OPEN) {
             this.socket.send(JSON.stringify({ type, ...payload }));
         } else {
-            console.warn("[WS] Intento de envío sin conexión activa");
+            logger.warn('Intento de envío sin conexión activa', { type });
         }
     }
 
@@ -80,7 +83,10 @@ class WebSocketClient {
             this.reconnectAttempts++;
             setTimeout(() => this.connect(), this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1));
         } else {
-            console.error("[WS] Máximo de intentos de reconexión alcanzado");
+            logger.error('Máximo de intentos de reconexión alcanzado', undefined, {
+                attempts: this.reconnectAttempts,
+                url: this.url,
+            });
         }
     }
 }

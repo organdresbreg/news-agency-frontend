@@ -7,6 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Send, Loader2 } from "lucide-react"
+import { api, getAuthHeaders } from "@/lib/api-client"
+import { createLogger } from "@/lib/logger"
+import { useApiError } from "@/hooks/useApiError"
+import { ApiError } from "@/types/errors"
+
+const logger = createLogger('ChatPage')
 
 interface Message {
     role: 'user' | 'assistant' | 'system'
@@ -15,6 +21,7 @@ interface Message {
 
 export default function ChatPage() {
     const router = useRouter()
+    const { handleError } = useApiError()
     const [messages, setMessages] = useState<Message[]>([])
     const [inputValue, setInputValue] = useState("")
     const [isLoading, setIsLoading] = useState(false)
@@ -34,28 +41,26 @@ export default function ChatPage() {
             }
 
             try {
+                logger.info('Iniciando sesión de chat');
                 // Crear o recuperar sesión
-                const sessionResponse = await fetch("http://localhost:8000/api/v1/auth/session", {
-                    method: "POST",
-                    headers: { "Authorization": `Bearer ${userToken}` }
-                })
-
-                if (!sessionResponse.ok) throw new Error("Error al crear sesión")
-                
-                const sessionData = await sessionResponse.json()
+                const sessionData = await api.post<{ token: { access_token: string } }>(
+                    '/api/v1/auth/session',
+                    undefined
+                )
                 sessionTokenRef.current = sessionData.token.access_token
+                logger.debug('Sesión creada', { token: '***' })
 
                 // Cargar historial
-                const historyResponse = await fetch("http://localhost:8000/api/v1/chatbot/messages", {
-                    headers: { "Authorization": `Bearer ${sessionTokenRef.current}` }
-                })
-
-                if (historyResponse.ok) {
-                    const historyData = await historyResponse.json()
+                try {
+                    const historyData = await api.get<{ messages: Message[] }>('/api/v1/chatbot/messages')
                     setMessages(historyData.messages || [])
+                    logger.debug('Historial cargado', { count: historyData.messages?.length })
+                } catch (historyError) {
+                    logger.warn('No se pudo cargar el historial', { error: String(historyError) })
                 }
             } catch (error) {
-                console.error("Error inicializando chat:", error)
+                logger.error('Error inicializando chat', error as Error)
+                handleError(error, { customMessage: 'No se pudo iniciar el chat' })
             } finally {
                 setIsInitializing(false)
             }
@@ -83,18 +88,28 @@ export default function ChatPage() {
         setMessages(prev => [...prev, { role: 'assistant', content: "" }])
 
         try {
-            const response = await fetch("http://localhost:8000/api/v1/chatbot/chat/stream", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${sessionTokenRef.current}`
-                },
-                body: JSON.stringify({
-                    messages: [...messages, userMessage].filter(m => m.content.trim() !== "")
-                })
-            })
+            logger.debug('Enviando mensaje al chat')
+            const response = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/chatbot/chat/stream`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...getAuthHeaders(),
+                    },
+                    body: JSON.stringify({
+                        messages: [...messages, userMessage].filter(m => m.content.trim() !== "")
+                    })
+                }
+            )
 
-            if (!response.ok) throw new Error("Error en el stream")
+            if (!response.ok) {
+                throw new ApiError(
+                    `Error en el stream`,
+                    response.status,
+                    'STREAM_ERROR'
+                )
+            }
 
             const reader = response.body?.getReader()
             if (!reader) return
@@ -120,7 +135,6 @@ export default function ChatPage() {
                             
                             if (data.content) {
                                 assistantContent += data.content
-                                // Actualizar el estado con el contenido acumulado
                                 setMessages(prev => {
                                     const newMessages = [...prev]
                                     const lastMsg = newMessages[newMessages.length - 1]
@@ -131,14 +145,23 @@ export default function ChatPage() {
                                 })
                             }
                         } catch (e) {
-                            console.warn("Error parseando chunk:", e, trimmedLine)
+                            logger.warn('Error parseando chunk de stream', { chunk: trimmedLine })
                         }
                     }
                 }
             }
+            logger.debug('Stream completado', { chars: assistantContent.length })
         } catch (error) {
-            console.error("Error en el chat:", error)
-            setMessages(prev => [...prev, { role: 'assistant', content: "Lo siento, ocurrió un error al procesar tu solicitud." }])
+            logger.error('Error en el chat', error as Error)
+            handleError(error, { customMessage: 'Error al procesar tu mensaje' })
+            // Quitar el mensaje asistente vacío si el stream falló antes de recibir contenido
+            setMessages(prev => {
+                const last = prev[prev.length - 1]
+                if (last?.role === 'assistant' && last.content === '') {
+                    return prev.slice(0, -1)
+                }
+                return [...prev, { role: 'assistant', content: 'Lo siento, ocurrió un error al procesar tu solicitud.' }]
+            })
         } finally {
             setIsLoading(false)
         }

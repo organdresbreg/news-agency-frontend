@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '@/lib/api-client';
+import { logger } from '@/lib/logger';
 import {
     Trash2, Plus, Globe, Rss, Pencil,
     X, Share2, Database, Video, FileText,
@@ -77,10 +78,10 @@ const Sources = () => {
 
     const fetchSources = async () => {
         try {
-            const response = await axios.get('http://localhost:8000/api/v1/newsroom/sources');
-            setSources(response.data);
+            const data = await api.get<any[]>('/api/v1/newsroom/sources');
+            setSources(data);
         } catch (error) {
-            console.error('Error fetching sources:', error);
+            logger.error('Error fetching sources:', error as Error);
             toast.error('Error al cargar las fuentes');
         } finally {
             setLoading(false);
@@ -117,16 +118,16 @@ const Sources = () => {
         };
         try {
             if (editingId) {
-                await axios.put(`http://localhost:8000/api/v1/newsroom/sources/${editingId}`, payload);
+                await api.put(`/api/v1/newsroom/sources/${editingId}`, payload);
                 toast.success('Fuente actualizada correctamente');
             } else {
-                await axios.post('http://localhost:8000/api/v1/newsroom/sources', payload);
+                await api.post('/api/v1/newsroom/sources', payload);
                 toast.success('Fuente agregada correctamente');
             }
             resetForm();
             fetchSources();
         } catch (error) {
-            console.error('Error saving source:', error);
+            logger.error('Error saving source:', error as Error);
             toast.error('Error al guardar la fuente');
         }
     };
@@ -134,11 +135,11 @@ const Sources = () => {
     const handleDelete = async (id: number) => {
         if (!window.confirm('¿Estás seguro de que deseas eliminar esta fuente?')) return;
         try {
-            await axios.delete(`http://localhost:8000/api/v1/newsroom/sources/${id}`);
+            await api.delete(`/api/v1/newsroom/sources/${id}`);
             toast.success('Fuente eliminada correctamente');
             fetchSources();
         } catch (error) {
-            console.error('Error deleting source:', error);
+            logger.error('Error deleting source:', error as Error);
             toast.error('Error al eliminar la fuente');
         }
     };
