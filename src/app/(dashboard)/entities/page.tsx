@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+import { api } from '@/lib/api-client';
+import { useApiError } from '@/hooks/useApiError';
 import {
     Trash2, Plus, Database, Pencil,
     X, User, Building2, MapPin, Lightbulb,
     CheckCircle2, Link2, Info, EyeOff, Eye,
     LayoutGrid, Search, Settings
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -46,6 +46,7 @@ const getColorClasses = (color: string) => {
 };
 
 const Entities = () => {
+    const { handleError, handleSuccess } = useApiError();
     const [entities, setEntities] = useState<any[]>([]);
     const [sources, setSources] = useState<any[]>([]);
     const [entityTypes, setEntityTypes] = useState<any[]>([]);
@@ -73,21 +74,20 @@ const Entities = () => {
         setLoading(true);
         try {
             const [entitiesRes, sourcesRes, typesRes] = await Promise.all([
-                axios.get('http://localhost:8000/api/v1/newsroom/entities?include_ignored=true'),
-                axios.get('http://localhost:8000/api/v1/newsroom/sources'),
-                axios.get('http://localhost:8000/api/v1/newsroom/entity-types')
+                api.get('/api/v1/newsroom/entities?include_ignored=true'),
+                api.get('/api/v1/newsroom/sources'),
+                api.get('/api/v1/newsroom/entity-types')
             ]);
-            setEntities(entitiesRes.data);
-            setSources(sourcesRes.data);
-            setEntityTypes(typesRes.data);
+            setEntities(entitiesRes);
+            setSources(sourcesRes);
+            setEntityTypes(typesRes);
 
             // Set default type to first available type
-            if (typesRes.data.length > 0 && !formData.type) {
-                setFormData(prev => ({ ...prev, type: typesRes.data[0].name }));
+            if (typesRes.length > 0 && !formData.type) {
+                setFormData(prev => ({ ...prev, type: typesRes[0].name }));
             }
         } catch (error) {
-            console.error('Error fetching data:', error);
-            toast.error('Error al cargar datos');
+            handleError(error, { showToast: false });
         } finally {
             setLoading(false);
         }
@@ -114,30 +114,28 @@ const Entities = () => {
         e.preventDefault();
         try {
             if (editingTypeId) {
-                await axios.put(`http://localhost:8000/api/v1/newsroom/entity-types/${editingTypeId}`, typeFormData);
-                toast.success('Tipo de entidad actualizado correctamente');
+                await api.put(`/api/v1/newsroom/entity-types/${editingTypeId}`, typeFormData);
+                handleSuccess('Tipo de entidad actualizado correctamente');
             } else {
-                await axios.post('http://localhost:8000/api/v1/newsroom/entity-types', typeFormData);
-                toast.success('Tipo de entidad creado correctamente');
+                await api.post('/api/v1/newsroom/entity-types', typeFormData);
+                handleSuccess('Tipo de entidad creado correctamente');
             }
             setTypeFormData({ name: '', color: 'blue' });
             setEditingTypeId(null);
             fetchData();
-        } catch (error: any) {
-            console.error('Error saving entity type:', error);
-            toast.error(error.response?.data?.detail || 'Error al guardar tipo de entidad');
+        } catch (error) {
+            handleError(error);
         }
     };
 
     const handleDeleteType = async (id: number) => {
         if (!window.confirm('¿Estás seguro de que deseas eliminar este tipo? Las entidades asociadas podrían perder su estilo.')) return;
         try {
-            await axios.delete(`http://localhost:8000/api/v1/newsroom/entity-types/${id}`);
-            toast.success('Tipo de entidad eliminado correctamente');
+            await api.delete(`/api/v1/newsroom/entity-types/${id}`);
+            handleSuccess('Tipo de entidad eliminado correctamente');
             fetchData();
         } catch (error) {
-            console.error('Error deleting entity type:', error);
-            toast.error('Error al eliminar tipo de entidad');
+            handleError(error);
         }
     };
 
@@ -169,29 +167,27 @@ const Entities = () => {
             };
 
             if (editingId) {
-                await axios.put(`http://localhost:8000/api/v1/newsroom/entities/${editingId}`, dataToSend);
-                toast.success('Entidad actualizada correctamente');
+                await api.put(`/api/v1/newsroom/entities/${editingId}`, dataToSend);
+                handleSuccess('Entidad actualizada correctamente');
             } else {
-                await axios.post('http://localhost:8000/api/v1/newsroom/entities', dataToSend);
-                toast.success('Entidad creada correctamente');
+                await api.post('/api/v1/newsroom/entities', dataToSend);
+                handleSuccess('Entidad creada correctamente');
             }
             resetForm();
             fetchData();
         } catch (error) {
-            console.error('Error saving entity:', error);
-            toast.error('Error al guardar la entidad');
+            handleError(error);
         }
     };
 
     const handleDelete = async (id: number) => {
         if (!window.confirm('¿Estás seguro de que deseas eliminar esta entidad?')) return;
         try {
-            await axios.delete(`http://localhost:8000/api/v1/newsroom/entities/${id}`);
-            toast.success('Entidad eliminada correctamente');
+            await api.delete(`/api/v1/newsroom/entities/${id}`);
+            handleSuccess('Entidad eliminada correctamente');
             fetchData();
         } catch (error) {
-            console.error('Error deleting entity:', error);
-            toast.error('Error al eliminar la entidad');
+            handleError(error);
         }
     };
 
@@ -206,12 +202,11 @@ const Entities = () => {
 
     const handleToggleIgnore = async (id: number) => {
         try {
-            await axios.put(`http://localhost:8000/api/v1/newsroom/entities/${id}/ignore`);
-            toast.success('Estado de entidad actualizado');
+            await api.put(`/api/v1/newsroom/entities/${id}/ignore`);
+            handleSuccess('Estado de entidad actualizado');
             fetchData();
         } catch (error) {
-            console.error('Error toggling ignore:', error);
-            toast.error('Error al actualizar entidad');
+            handleError(error);
         }
     };
 

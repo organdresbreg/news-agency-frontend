@@ -7,6 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Send, Loader2 } from "lucide-react"
+import { createLogger } from "@/lib/logger"
+import { api } from "@/lib/api-client"
+import { useApiError } from "@/hooks/useApiError"
+
+const logger = createLogger('Chat')
 
 interface Message {
     role: 'user' | 'assistant' | 'system'
@@ -15,6 +20,7 @@ interface Message {
 
 export default function ChatPage() {
     const router = useRouter()
+    const { handleError } = useApiError()
     const [messages, setMessages] = useState<Message[]>([])
     const [inputValue, setInputValue] = useState("")
     const [isLoading, setIsLoading] = useState(false)
@@ -35,34 +41,25 @@ export default function ChatPage() {
 
             try {
                 // Crear o recuperar sesión
-                const sessionResponse = await fetch("http://localhost:8000/api/v1/auth/session", {
-                    method: "POST",
-                    headers: { "Authorization": `Bearer ${userToken}` }
-                })
-
-                if (!sessionResponse.ok) throw new Error("Error al crear sesión")
-                
-                const sessionData = await sessionResponse.json()
+                const sessionData = await api.post<{ token: { access_token: string } }>("/api/v1/auth/session")
                 sessionTokenRef.current = sessionData.token.access_token
 
                 // Cargar historial
-                const historyResponse = await fetch("http://localhost:8000/api/v1/chatbot/messages", {
+                const historyData = await api.get<{ messages: Message[] }>("/api/v1/chatbot/messages", {
+                    skipAuth: true,
                     headers: { "Authorization": `Bearer ${sessionTokenRef.current}` }
                 })
-
-                if (historyResponse.ok) {
-                    const historyData = await historyResponse.json()
-                    setMessages(historyData.messages || [])
-                }
+                setMessages(historyData.messages || [])
             } catch (error) {
-                console.error("Error inicializando chat:", error)
+                logger.error("Error inicializando chat", error as Error)
+                handleError(error)
             } finally {
                 setIsInitializing(false)
             }
         }
 
         initChat()
-    }, [router])
+    }, [router, handleError])
 
     // Scroll automático al final
     useEffect(() => {
@@ -83,7 +80,7 @@ export default function ChatPage() {
         setMessages(prev => [...prev, { role: 'assistant', content: "" }])
 
         try {
-            const response = await fetch("http://localhost:8000/api/v1/chatbot/chat/stream", {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/chatbot/chat/stream`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -131,13 +128,14 @@ export default function ChatPage() {
                                 })
                             }
                         } catch (e) {
-                            console.warn("Error parseando chunk:", e, trimmedLine)
+                            logger.warn("Error parseando chunk", e as Error, { chunk: trimmedLine })
                         }
                     }
                 }
             }
         } catch (error) {
-            console.error("Error en el chat:", error)
+            logger.error("Error en el chat", error as Error)
+            handleError(error, { customMessage: "Lo siento, ocurrió un error al procesar tu solicitud." })
             setMessages(prev => [...prev, { role: 'assistant', content: "Lo siento, ocurrió un error al procesar tu solicitud." }])
         } finally {
             setIsLoading(false)

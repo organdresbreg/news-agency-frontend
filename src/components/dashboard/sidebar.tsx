@@ -7,6 +7,10 @@ import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { MessageSquare, Menu, X, Home, LogOut, Sun, Moon, Newspaper, Database, Rss, Trash2 } from "lucide-react"
+import { createLogger } from "@/lib/logger"
+import { api } from "@/lib/api-client"
+
+const logger = createLogger('Sidebar')
 
 export function Sidebar() {
     const [collapsed, setCollapsed] = useState(false)
@@ -26,15 +30,10 @@ export function Sidebar() {
         try {
             const token = localStorage.getItem("access_token");
             if (token) {
-                await fetch("http://localhost:8000/api/v1/auth/logout", {
-                    method: "POST",
-                    headers: {
-                        "Authorization": `Bearer ${token}`
-                    }
-                });
+                await api.post("/api/v1/auth/logout");
             }
         } catch (error) {
-            console.error("Logout error:", error);
+            logger.error("Logout error", error as Error);
         } finally {
             localStorage.removeItem("access_token");
             router.push("/login");
