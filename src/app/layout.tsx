@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   description: "Sistema de generación de noticias con Agentes AI, HITL y MCPs en tiempo real.",
 };
 
+import { Toaster } from "@/components/ui/sonner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -29,6 +31,7 @@ export default function RootLayout({
         <Providers>
           {children}
         </Providers>
+        <Toaster />
       </body>
     </html>
   );

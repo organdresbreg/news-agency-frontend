@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Menu, X, Home, LogOut, Sun, Moon } from "lucide-react"
+import { MessageSquare, Menu, X, Home, LogOut, Sun, Moon, Newspaper, Database, Rss, Trash2 } from "lucide-react"
 
 export function Sidebar() {
     const [collapsed, setCollapsed] = useState(false)
@@ -87,6 +87,54 @@ export function Sidebar() {
             >
             <MessageSquare className="h-4 w-4 shrink-0" />
             {!collapsed && <span>Chat</span>}
+            </Button>
+        </Link>
+        <Link href="/news">
+            <Button
+            variant={pathname === "/news" ? "secondary" : "ghost"}
+            className={cn(
+                "w-full justify-start gap-2",
+                collapsed && "justify-center px-0"
+            )}
+            >
+            <Newspaper className="h-4 w-4 shrink-0" />
+            {!collapsed && <span>Noticias</span>}
+            </Button>
+        </Link>
+        <Link href="/entities">
+            <Button
+            variant={pathname === "/entities" ? "secondary" : "ghost"}
+            className={cn(
+                "w-full justify-start gap-2",
+                collapsed && "justify-center px-0"
+            )}
+            >
+            <Database className="h-4 w-4 shrink-0" />
+            {!collapsed && <span>Entidades</span>}
+            </Button>
+        </Link>
+        <Link href="/sources">
+            <Button
+            variant={pathname === "/sources" ? "secondary" : "ghost"}
+            className={cn(
+                "w-full justify-start gap-2",
+                collapsed && "justify-center px-0"
+            )}
+            >
+            <Rss className="h-4 w-4 shrink-0" />
+            {!collapsed && <span>Fuentes</span>}
+            </Button>
+        </Link>
+        <Link href="/trash">
+            <Button
+            variant={pathname === "/trash" ? "secondary" : "ghost"}
+            className={cn(
+                "w-full justify-start gap-2",
+                collapsed && "justify-center px-0"
+            )}
+            >
+            <Trash2 className="h-4 w-4 shrink-0" />
+            {!collapsed && <span>Papelera</span>}
             </Button>
         </Link>
         </div>
