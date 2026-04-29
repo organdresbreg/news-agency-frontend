@@ -25,12 +25,12 @@ class ApiClient {
         return getAuthHeaders();
     }
 
-    private async request<T>(
+    async request<T>(
         endpoint: string,
         init: RequestInit = {},
     ): Promise<T> {
         const method = (init.method ?? 'GET').toUpperCase();
-        const url = `${this.baseURL}${endpoint}`;
+        const url = endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`;
         const start = performance.now();
 
         logger.debug(`→ ${method} ${endpoint}`);
@@ -77,6 +77,14 @@ class ApiClient {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: data !== undefined ? JSON.stringify(data) : undefined,
+        });
+    }
+
+    postForm<T>(endpoint: string, data: URLSearchParams) {
+        return this.request<T>(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: data,
         });
     }
 

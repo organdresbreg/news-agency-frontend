@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useMutation } from "@tanstack/react-query"
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
@@ -13,60 +12,66 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Eye, EyeOff } from "lucide-react"
 import { ModeToggle } from "@/components/mode-toggle"
 
+import { useApiError } from "@/hooks/useApiError"
+import { api } from "@/lib/api-client"
+import { logger } from "@/lib/logger"
+
 interface RegisterResponse {
     message: string
 }
 
-const registerUser = async ({ name, email, password }: { name: string; email: string; password: string }): Promise<RegisterResponse> => {
-    const response = await fetch("http://localhost:8000/api/v1/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: name, email, password }),
-    })
-
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.detail || "Error en el registro")
-    }
-
-    return response.json()
-}
-
 export default function RegisterPage() {
     const router = useRouter()
+    const { handleError } = useApiError()
     const [name, setName] = useState("")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+    const [isSubmitting, setIsSubmitting] = useState(false)
 
-    const mutation = useMutation({
-        mutationFn: registerUser,
-        onSuccess: () => {
-            router.push("/login")
-        },
-        onError: (err) => {
-            setError(err.message || "Ocurrió un error al registrarse")
-        },
-    })
-
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        setError(null)
+
+        // Validación unificada
+        if (!name || !email || !password || !confirmPassword) {
+            handleError("Por favor, completá todos los campos")
+            return
+        }
 
         if (password !== confirmPassword) {
-            setError("Las contraseñas no coinciden")
+            handleError("Las contraseñas no coinciden")
             return
         }
 
-        if (password.length < 6) {
-            setError("La contraseña debe tener al menos 6 caracteres")
+        if (password.length < 8) {
+            handleError("La contraseña debe tener al menos 8 caracteres")
+            return
+        }
+        
+        if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])/.test(password)) {
+            handleError("La contraseña debe incluir mayúscula, minúscula, número y símbolo")
             return
         }
 
-        mutation.mutate({ name, email, password })
+        setIsSubmitting(true)
+        logger.debug("Intentando registrar usuario", { username: name, email })
+
+        try {
+            await api.post<RegisterResponse>("/api/v1/auth/register", {
+                username: name,
+                email,
+                password
+            })
+            
+            logger.info("Usuario registrado correctamente", { username: name, email })
+            router.push("/login")
+        } catch (err) {
+            handleError(err, "Error al registrarse. Verificá los datos.")
+        } finally {
+            setIsSubmitting(false)
+        }
     }
 
     return (
@@ -81,11 +86,7 @@ export default function RegisterPage() {
 
                 <form onSubmit={handleSubmit}>
                     <CardContent className="space-y-5 px-8">
-                        {error && (
-                            <Alert variant="destructive">
-                                <AlertDescription>{error}</AlertDescription>
-                            </Alert>
-                        )}
+                        {/* Los errores se manejan centralizadamente vía toasts */}
 
                         <div className="space-y-2">
                             <Label htmlFor="name">Nombre</Label>
@@ -96,7 +97,7 @@ export default function RegisterPage() {
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 required
-                                disabled={mutation.isPending}
+                                disabled={isSubmitting}
                             />
                         </div>
 
@@ -109,7 +110,7 @@ export default function RegisterPage() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                disabled={mutation.isPending}
+                                disabled={isSubmitting}
                             />
                         </div>
 
@@ -123,7 +124,7 @@ export default function RegisterPage() {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
-                                    disabled={mutation.isPending}
+                                    disabled={isSubmitting}
                                     className="pr-10"
                                 />
                                 <button
@@ -147,7 +148,7 @@ export default function RegisterPage() {
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     required
-                                    disabled={mutation.isPending}
+                                    disabled={isSubmitting}
                                     className="pr-10"
                                 />
                                 <button
@@ -166,9 +167,9 @@ export default function RegisterPage() {
                         <Button
                             type="submit"
                             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-all duration-200"
-                            disabled={mutation.isPending}
+                            disabled={isSubmitting}
                         >
-                            {mutation.isPending ? (
+                            {isSubmitting ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     Registrando...
