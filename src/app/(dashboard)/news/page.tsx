@@ -55,7 +55,7 @@ const News = () => {
 
     const fetchSources = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/v1/newsroom/sources');
+            const response = await fetch('http://localhost:8000/api/v1/sources');
             if (response.ok) {
                 const data = await response.json();
                 setSources(data);

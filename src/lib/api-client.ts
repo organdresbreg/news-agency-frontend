@@ -3,7 +3,7 @@ import { NetworkError } from '@/types/errors';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('ApiClient');
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 /**
  * Devuelve el header Authorization si hay un token en localStorage.

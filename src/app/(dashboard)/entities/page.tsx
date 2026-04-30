@@ -77,7 +77,7 @@ const Entities = () => {
         try {
             const [entitiesRes, sourcesRes, typesRes] = await Promise.all([
                 api.get<any[]>('/api/v1/newsroom/entities?include_ignored=true'),
-                api.get<any[]>('/api/v1/newsroom/sources'),
+                api.get<any[]>('/api/v1/sources'),
                 api.get<any[]>('/api/v1/newsroom/entity-types')
             ]);
             setEntities(entitiesRes);
