@@ -367,9 +367,21 @@ const News = () => {
                                             <div className="flex flex-col justify-center">
                                                 <span
                                                     title={item.title_es || item.title}
-                                                    className={`font-medium line-clamp-1 text-sm cursor-default ${!item.title_es ? 'opacity-60' : ''}`}
+                                                    className={cn(
+                                                        "font-medium line-clamp-1 text-sm cursor-default",
+                                                        !item.title_es && "opacity-60"
+                                                    )}
                                                 >
-                                                    {item.title_es || item.title}
+                                                    {item.title_es?.startsWith('[') ? (
+                                                        <>
+                                                            <span className="text-red-600 dark:text-red-400">
+                                                                {item.title_es.substring(0, item.title_es.indexOf(']') + 1)}
+                                                            </span>
+                                                            {" "}{item.title_es.substring(item.title_es.indexOf(']') + 1).trim()}
+                                                        </>
+                                                    ) : (
+                                                        item.title_es || item.title
+                                                    )}
                                                 </span>
                                                 {item.entities && item.entities.length > 0 && (
                                                     <div className="flex flex-wrap gap-1 mt-1.5">
