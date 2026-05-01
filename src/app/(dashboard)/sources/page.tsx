@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { logger } from '@/lib/logger';
 import {
     Trash2, Plus, Globe, Rss, Pencil,
     X, Share2, Database, Video, FileText,
-    CheckCircle2, AlertCircle
+    CheckCircle2, AlertCircle, ChevronDown,
+    AlertTriangle, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -81,25 +82,74 @@ const SourceSkeleton = () => (
 
 const Sources = () => {
     const queryClient = useQueryClient();
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    
+    // Modal & Form States
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [step, setStep] = useState(1);
     const [selectedType, setSelectedType] = useState<any>(null);
     const [editingId, setEditingId] = useState<number | null>(null);
-    const [formData, setFormData] = useState({ name: '', url: '' });
+    const [formData, setFormData] = useState({ name: '', url: '', category: 'General' });
+    const [isCustomCategory, setIsCustomCategory] = useState(false);
     const [previewData, setPreviewData] = useState<any>(null);
     const [testingSource, setTestingSource] = useState(false);
     const [testError, setTestError] = useState<string | null>(null);
+    
+    // Confirmation Dialog State
+    const [confirmDialog, setConfirmDialog] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        type: 'danger' | 'warning';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => {},
+        type: 'warning'
+    });
 
-    // React Query for fetching
-    const { data: sources = [], isLoading } = useQuery({
+    // React Query for fetching sources
+    const { data: sources = [], isLoading: isLoadingSources } = useQuery({
         queryKey: ['sources'],
         queryFn: () => api.get<any[]>('/api/v1/sources'),
-        staleTime: 1000 * 60 * 5, // 5 minutes cache
+        staleTime: 1000 * 60 * 5,
     });
+
+    // React Query for fetching categories (from DB)
+    const { data: dbCategories = [], isLoading: isLoadingCategories } = useQuery({
+        queryKey: ['categories'],
+        queryFn: () => api.get<any[]>('/api/v1/categories'),
+        staleTime: 1000 * 60 * 10,
+    });
+
+    // Handle click outside dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Process categories for the UI (sorted)
+    const allAvailableCategories = dbCategories
+        .map(c => c.name)
+        .sort((a, b) => a.localeCompare(b));
 
     // Mutations
     const saveMutation = useMutation({
-        mutationFn: (payload: any) => {
+        mutationFn: async (payload: any) => {
+            // First, if it's a custom category, create it in DB
+            if (isCustomCategory && payload.category) {
+                await api.post('/api/v1/categories', { name: payload.category });
+                queryClient.invalidateQueries({ queryKey: ['categories'] });
+            }
+
             if (editingId) {
                 return api.put(`/api/v1/sources/${editingId}`, payload);
             }
@@ -128,18 +178,39 @@ const Sources = () => {
         }
     });
 
+    const createCategoryMutation = useMutation({
+        mutationFn: (name: string) => api.post('/api/v1/categories', { name }),
+        onSuccess: (data: any) => {
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+            setIsCustomCategory(false);
+            setFormData(prev => ({ ...prev, category: data.name }));
+            toast.success('Categoría creada correctamente');
+        },
+        onError: (error: any) => {
+            logger.error('Error creating category:', error as Error);
+            const errorMsg = error?.response?.data?.detail || 'Error al crear la categoría';
+            toast.error(errorMsg);
+        }
+    });
+
     const resetForm = () => {
-        setFormData({ name: '', url: '' });
+        setFormData({ name: '', url: '', category: 'General' });
         setSelectedType(null);
         setEditingId(null);
         setStep(1);
         setIsModalOpen(false);
         setPreviewData(null);
         setTestError(null);
+        setIsCustomCategory(false);
+        setIsDropdownOpen(false);
     };
 
     const handleEdit = (source: any) => {
-        setFormData({ name: source.name, url: source.url });
+        setFormData({ 
+            name: source.name, 
+            url: source.url, 
+            category: source.category || 'General' 
+        });
         setSelectedType(SOURCE_TYPES.find(t => t.id === source.type));
         setEditingId(source.id);
         setPreviewData({ suggested_frequency_minutes: source.fetch_frequency_minutes });
@@ -184,6 +255,7 @@ const Sources = () => {
             name: formData.name,
             type: selectedType.id,
             url: formData.url,
+            category: formData.category,
             active: true,
             fetch_frequency_minutes: previewData?.suggested_frequency_minutes || 60,
             tier: 3,
@@ -193,9 +265,36 @@ const Sources = () => {
         saveMutation.mutate(payload);
     };
 
-    const handleDelete = async (id: number) => {
-        if (!window.confirm('¿Estás seguro de que deseas eliminar esta fuente?')) return;
-        deleteMutation.mutate(id);
+    const handleDeleteSource = (id: number) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Eliminar Fuente',
+            message: '¿Estás seguro de que deseas eliminar esta fuente? Esta acción no se puede deshacer.',
+            type: 'danger',
+            onConfirm: () => {
+                deleteMutation.mutate(id);
+                setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+            }
+        });
+    };
+
+    const handleDeleteCategory = (e: React.MouseEvent, category: string) => {
+        e.stopPropagation();
+        if (category === 'General') return;
+
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Eliminar Categoría',
+            message: `¿Deseas eliminar definitivamente la categoría "${category}" de la base de datos? Esto afectará a todas las fuentes que la utilicen.`,
+            type: 'warning',
+            onConfirm: () => {
+                deleteCategoryMutation.mutate(category);
+                if (formData.category === category) {
+                    setFormData({ ...formData, category: 'General' });
+                }
+                setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+            }
+        });
     };
 
     const getTypeIcon = (typeId: string) => {
@@ -208,8 +307,39 @@ const Sources = () => {
         return type ? type.color : 'text-gray-500';
     };
 
+    const isLoading = isLoadingSources || isLoadingCategories;
+
     return (
         <div className="p-8 bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-300">
+            {/* Custom Confirmation Modal */}
+            {confirmDialog.isOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px] animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100 dark:border-gray-700">
+                        <div className="p-6">
+                            <div className={`w-12 h-12 rounded-full mb-4 flex items-center justify-center ${confirmDialog.type === 'danger' ? 'bg-red-50 dark:bg-red-900/20' : 'bg-amber-50 dark:bg-amber-900/20'}`}>
+                                <AlertTriangle className={`w-6 h-6 ${confirmDialog.type === 'danger' ? 'text-red-600' : 'text-amber-600'}`} />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{confirmDialog.title}</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{confirmDialog.message}</p>
+                        </div>
+                        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 flex justify-end gap-3 border-t border-gray-100 dark:border-gray-700">
+                            <button 
+                                onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                                className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={confirmDialog.onConfirm}
+                                className={`px-6 py-2 text-sm font-bold text-white rounded-lg shadow-md transition-all active:scale-95 cursor-pointer ${confirmDialog.type === 'danger' ? 'bg-red-600 hover:bg-red-700 shadow-red-500/20' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20'}`}
+                            >
+                                Aceptar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div className="animate-in fade-in slide-in-from-left-4 duration-500">
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -249,7 +379,7 @@ const Sources = () => {
                                 key={source.id}
                                 className="group bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4 hover:shadow-lg hover:shadow-indigo-500/5 transition-all relative overflow-hidden flex flex-col justify-center animate-in fade-in slide-in-from-bottom-2 duration-300"
                                 style={{ 
-                                    minHeight: '130px',
+                                    minHeight: '145px',
                                     animationDelay: `${idx * 50}ms`
                                 }}
                             >
@@ -261,19 +391,24 @@ const Sources = () => {
                                         <Pencil size={14} />
                                     </button>
                                     <button
-                                        onClick={() => handleDelete(source.id)}
+                                        onClick={() => handleDeleteSource(source.id)}
                                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors cursor-pointer"
                                     >
                                         <Trash2 size={14} />
                                     </button>
                                 </div>
-                                <h3 className="text-base font-bold text-gray-900 dark:text-white truncate pr-14 mb-3" title={source.name}>
-                                    {source.name}
-                                </h3>
+                                <div className="flex items-start justify-between mb-2">
+                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate pr-8" title={source.name}>
+                                        {source.name}
+                                    </h3>
+                                    <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100/50 dark:border-indigo-800/30">
+                                        {source.category || 'General'}
+                                    </span>
+                                </div>
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-1.5">
-                                        <Icon className={`w-4 h-4 ${getTypeColor(source.type)}`} />
-                                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                                        <Icon className={`w-3.5 h-3.5 ${getTypeColor(source.type)}`} />
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
                                             {source.type}
                                         </span>
                                     </div>
@@ -296,7 +431,7 @@ const Sources = () => {
                                         </span>
                                     )}
                                 </div>
-                                <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate font-mono bg-gray-50 dark:bg-gray-900/50 p-2 rounded-lg border border-gray-100/50 dark:border-gray-800/50" title={source.url}>
+                                <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate font-mono bg-gray-50 dark:bg-gray-900/50 p-2 rounded-lg border border-gray-100/50 dark:border-gray-800/50" title={source.url}>
                                     {source.url}
                                 </p>
                             </div>
@@ -357,25 +492,130 @@ const Sources = () => {
                                         </div>
                                     </div>
                                     <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Nombre</label>
-                                            <input
-                                                type="text"
-                                                value={formData.name}
-                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                required
-                                                autoFocus
-                                                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all text-gray-900 dark:text-white"
-                                            />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Nombre</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.name}
+                                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                    placeholder="Ej: Reuters Geopolitics"
+                                                    required
+                                                    autoFocus
+                                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all text-gray-900 dark:text-white placeholder:text-gray-400"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Categoría</label>
+                                                <div className="relative" ref={dropdownRef}>
+                                                    {isCustomCategory ? (
+                                                        <div className="relative flex items-center animate-in fade-in slide-in-from-right-2 duration-200">
+                                                            <input
+                                                                type="text"
+                                                                value={formData.category}
+                                                                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        if (formData.category.trim()) {
+                                                                            createCategoryMutation.mutate(formData.category.trim());
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                placeholder="Nueva categoría..."
+                                                                autoFocus
+                                                                className="w-full px-4 py-3 bg-indigo-50/30 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all text-gray-900 dark:text-white font-medium pr-20"
+                                                            />
+                                                            <div className="absolute right-2 flex items-center gap-1">
+                                                                <button 
+                                                                    type="button" 
+                                                                    onClick={() => {
+                                                                        if (formData.category.trim()) {
+                                                                            createCategoryMutation.mutate(formData.category.trim());
+                                                                        } else {
+                                                                            toast.error('Ingresa un nombre para la categoría');
+                                                                        }
+                                                                    }}
+                                                                    className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-all cursor-pointer"
+                                                                    title="Guardar categoría"
+                                                                    disabled={createCategoryMutation.isPending}
+                                                                >
+                                                                    {createCategoryMutation.isPending ? (
+                                                                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-emerald-600 border-t-transparent"></div>
+                                                                    ) : (
+                                                                        <Check size={18} />
+                                                                    )}
+                                                                </button>
+                                                                <button 
+                                                                    type="button" 
+                                                                    onClick={() => { setIsCustomCategory(false); setFormData({...formData, category: 'General'}); }}
+                                                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all cursor-pointer"
+                                                                    title="Cancelar"
+                                                                >
+                                                                    <X size={18} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex gap-2">
+                                                            <div className="relative flex-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all text-gray-900 dark:text-white flex items-center justify-between cursor-pointer group"
+                                                                >
+                                                                    <span className="truncate">{formData.category}</span>
+                                                                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-indigo-500' : 'group-hover:text-indigo-400'}`} />
+                                                                </button>
+                                                                
+                                                                {isDropdownOpen && (
+                                                                    <div className="absolute z-[60] left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-xl max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-150 py-1 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
+                                                                        {allAvailableCategories.map(cat => (
+                                                                            <div
+                                                                                key={cat}
+                                                                                onClick={() => { setFormData({ ...formData, category: cat }); setIsDropdownOpen(false); }}
+                                                                                className="group flex items-center justify-between px-4 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer transition-colors"
+                                                                            >
+                                                                                <span className={`text-sm truncate pr-2 ${formData.category === cat ? 'font-bold text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                                                    {cat}
+                                                                                </span>
+                                                                                {cat !== 'General' && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => handleDeleteCategory(e, cat)}
+                                                                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                                                                                        title="Eliminar de la base de datos"
+                                                                                    >
+                                                                                        <Trash2 size={12} />
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => { setIsCustomCategory(true); setFormData({...formData, category: ''}); }}
+                                                                className="p-3 bg-indigo-600 hover:bg-indigo-700 text-white border border-transparent rounded-xl shadow-lg shadow-indigo-500/20 transition-all cursor-pointer group active:scale-95"
+                                                                title="Crear nueva categoría"
+                                                            >
+                                                                <Plus size={20} className="group-hover:scale-110 transition-transform" />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">URL</label>
+                                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">URL</label>
                                             <input
                                                 type="url"
                                                 value={formData.url}
                                                 onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                                                placeholder="https://ejemplo.com/rss"
                                                 required
-                                                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all text-gray-900 dark:text-white"
+                                                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all text-gray-900 dark:text-white placeholder:text-gray-400"
                                             />
                                         </div>
                                         
