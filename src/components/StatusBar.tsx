@@ -21,7 +21,7 @@ const StatusBar = () => {
         const checkStatus = async () => {
             try {
                 // Actualizado para apuntar a la nueva ruta en el backend
-                const response = await fetch('http://localhost:8000/api/v1/newsroom/status');
+                const response = await fetch('http://localhost:8000/api/v1/news/status');
                 if (response.ok) {
                     setBackendStatus('online');
                 } else {

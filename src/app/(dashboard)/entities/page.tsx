@@ -76,9 +76,9 @@ const Entities = () => {
         setLoading(true);
         try {
             const [entitiesRes, sourcesRes, typesRes] = await Promise.all([
-                api.get<any[]>('/api/v1/newsroom/entities?include_ignored=true'),
+                api.get<any[]>('/api/v1/news/entities?include_ignored=true'),
                 api.get<any[]>('/api/v1/sources'),
-                api.get<any[]>('/api/v1/newsroom/entity-types')
+                api.get<any[]>('/api/v1/news/entity-types')
             ]);
             setEntities(entitiesRes);
             setSources(sourcesRes);
@@ -117,10 +117,10 @@ const Entities = () => {
         e.preventDefault();
         try {
             if (editingTypeId) {
-                await api.put(`/api/v1/newsroom/entity-types/${editingTypeId}`, typeFormData);
+                await api.put(`/api/v1/news/entity-types/${editingTypeId}`, typeFormData);
                 toast.success('Tipo de entidad actualizado correctamente');
             } else {
-                await api.post('/api/v1/newsroom/entity-types', typeFormData);
+                await api.post('/api/v1/news/entity-types', typeFormData);
                 toast.success('Tipo de entidad creado correctamente');
             }
             setTypeFormData({ name: '', color: 'blue' });
@@ -135,7 +135,7 @@ const Entities = () => {
     const handleDeleteType = async (id: number) => {
         if (!window.confirm('¿Estás seguro de que deseas eliminar este tipo? Las entidades asociadas podrían perder su estilo.')) return;
         try {
-            await api.delete(`/api/v1/newsroom/entity-types/${id}`);
+            await api.delete(`/api/v1/news/entity-types/${id}`);
             toast.success('Tipo de entidad eliminado correctamente');
             fetchData();
         } catch (error) {
@@ -172,10 +172,10 @@ const Entities = () => {
             };
 
             if (editingId) {
-                await api.put(`/api/v1/newsroom/entities/${editingId}`, dataToSend);
+                await api.put(`/api/v1/news/entities/${editingId}`, dataToSend);
                 toast.success('Entidad actualizada correctamente');
             } else {
-                await api.post('/api/v1/newsroom/entities', dataToSend);
+                await api.post('/api/v1/news/entities', dataToSend);
                 toast.success('Entidad creada correctamente');
             }
             resetForm();
@@ -189,7 +189,7 @@ const Entities = () => {
     const handleDelete = async (id: number) => {
         if (!window.confirm('¿Estás seguro de que deseas eliminar esta entidad?')) return;
         try {
-            await api.delete(`/api/v1/newsroom/entities/${id}`);
+            await api.delete(`/api/v1/news/entities/${id}`);
             toast.success('Entidad eliminada correctamente');
             fetchData();
         } catch (error) {
@@ -209,7 +209,7 @@ const Entities = () => {
 
     const handleToggleIgnore = async (id: number) => {
         try {
-            await api.put(`/api/v1/newsroom/entities/${id}/ignore`);
+            await api.put(`/api/v1/news/entities/${id}/ignore`);
             toast.success('Estado de entidad actualizado');
             fetchData();
         } catch (error) {

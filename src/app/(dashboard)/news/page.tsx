@@ -28,7 +28,7 @@ const News = () => {
 
     const fetchStats = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/v1/newsroom/dashboard-stats');
+            const response = await fetch('http://localhost:8000/api/v1/news/dashboard-stats');
             if (response.ok) {
                 const data = await response.json();
                 setStats(data);
@@ -41,7 +41,7 @@ const News = () => {
     const fetchNews = async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const response = await fetch('http://localhost:8000/api/v1/newsroom/news/discovered');
+            const response = await fetch('http://localhost:8000/api/v1/news/news/discovered');
             if (response.ok) {
                 const data = await response.json();
                 setNewsItems(data);
@@ -68,7 +68,7 @@ const News = () => {
     const handleScan = async () => {
         setScanning(true);
         try {
-            const response = await fetch('http://localhost:8000/api/v1/newsroom/scan', { method: 'POST' });
+            const response = await fetch('http://localhost:8000/api/v1/news/scan', { method: 'POST' });
             if (response.ok) {
                 const data = await response.json();
                 toast.success(`Escaneo completado. ${data.new_items} noticias nuevas.`);
@@ -97,7 +97,7 @@ const News = () => {
         });
 
         try {
-            const response = await fetch(`http://localhost:8000/api/v1/newsroom/news/${id}/status`, {
+            const response = await fetch(`http://localhost:8000/api/v1/news/news/${id}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status })
@@ -128,7 +128,7 @@ const News = () => {
         let successCount = 0;
         for (const id of itemsToProcess) {
             try {
-                const response = await fetch(`http://localhost:8000/api/v1/newsroom/news/${id}/status`, {
+                const response = await fetch(`http://localhost:8000/api/v1/news/news/${id}/status`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status })
@@ -360,7 +360,19 @@ const News = () => {
                                                     )
                                                 )}
 
-                                                {!item.language && <span className="text-gray-400 text-[10px]">-</span>}
+                                                {/* Extraction/Refinement Progress */}
+                                                {item.status === 'EXTRACTING' && (
+                                                    <span title="Extrayendo entidades (SpaCy)..." className="inline-flex items-center w-5 h-4 justify-center rounded text-[10px] font-bold bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                                                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                                    </span>
+                                                )}
+                                                {item.status === 'REFINING' && (
+                                                    <span title="Refinando con LLM/Wikidata..." className="inline-flex items-center w-5 h-4 justify-center rounded text-[10px] font-bold bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
+                                                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                                    </span>
+                                                )}
+
+                                                {!item.language && !item.status && <span className="text-gray-400 text-[10px]">-</span>}
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-gray-900 dark:text-white align-middle">

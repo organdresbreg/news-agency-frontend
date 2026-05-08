@@ -20,8 +20,8 @@ const TrashArchive = () => {
         setLoading(true);
         try {
             const endpoint = viewMode === 'trash' 
-                ? '/api/v1/newsroom/news/rejected' 
-                : '/api/v1/newsroom/news/archived';
+                ? '/api/v1/news/news/rejected' 
+                : '/api/v1/news/news/archived';
             const data = await api.get<any[]>(endpoint);
             setNewsItems(data);
         } catch (error) {
@@ -40,7 +40,7 @@ const TrashArchive = () => {
             // For now, the existing put /news/{id}/restore works for both, 
             // but let's make sure backend allows restoring ARCHIVED.
             // Backend `restore_news_item` just sets status = "DISCOVERED".
-            await api.put(`/api/v1/newsroom/news/${id}/restore`);
+            await api.put(`/api/v1/news/news/${id}/restore`);
             toast.success('Noticia restaurada a la bandeja principal');
             addHighlight('dashboard', [id]);
         } catch (error) {
@@ -58,10 +58,10 @@ const TrashArchive = () => {
         setNewsItems(prev => prev.filter(item => item.id !== id));
         try {
             if (viewMode === 'trash') {
-                await api.delete(`/api/v1/newsroom/news/${id}`); // Soft delete (moves to ARCHIVED)
+                await api.delete(`/api/v1/news/news/${id}`); // Soft delete (moves to ARCHIVED)
                 toast.success('Noticia archivada');
             } else {
-                await api.delete(`/api/v1/newsroom/news/archived/${id}`); // Physical delete
+                await api.delete(`/api/v1/news/news/archived/${id}`); // Physical delete
                 toast.success('Noticia eliminada de la base de datos');
             }
         } catch (error) {
@@ -76,7 +76,7 @@ const TrashArchive = () => {
         setSelectedItems(new Set());
         setNewsItems(prev => prev.filter(item => !selectedItems.has(item.id)));
         try {
-            await api.post('/api/v1/newsroom/news/batch/restore', { ids: itemsToProcess });
+            await api.post('/api/v1/news/news/batch/restore', { ids: itemsToProcess });
             toast.success(`${itemsToProcess.length} noticias restauradas`);
             addHighlight('dashboard', itemsToProcess);
         } catch (error) {
@@ -96,10 +96,10 @@ const TrashArchive = () => {
         setNewsItems(prev => prev.filter(item => !selectedItems.has(item.id)));
         try {
             if (viewMode === 'trash') {
-                await api.post('/api/v1/newsroom/news/batch/delete', { ids: itemsToProcess });
+                await api.post('/api/v1/news/news/batch/delete', { ids: itemsToProcess });
                 toast.success(`${itemsToProcess.length} noticias archivadas`);
             } else {
-                await api.post('/api/v1/newsroom/news/archived/batch/delete', { ids: itemsToProcess });
+                await api.post('/api/v1/news/news/archived/batch/delete', { ids: itemsToProcess });
                 toast.success(`${itemsToProcess.length} noticias eliminadas físicamente`);
             }
         } catch (error) {
@@ -120,10 +120,10 @@ const TrashArchive = () => {
         setSelectedItems(new Set());
         try {
             if (viewMode === 'trash') {
-                await api.delete('/api/v1/newsroom/news/rejected/all');
+                await api.delete('/api/v1/news/news/rejected/all');
                 toast.success('Papelera vaciada al archivo');
             } else {
-                await api.delete('/api/v1/newsroom/news/archived/all');
+                await api.delete('/api/v1/news/news/archived/all');
                 toast.success('Archivo vaciado físicamente');
             }
         } catch (error) {
